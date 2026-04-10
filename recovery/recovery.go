@@ -1,4 +1,4 @@
-package recovery
+package recover
 
 import (
 	"encoding/json"
@@ -33,6 +33,7 @@ func Middleware(next http.Handler) http.Handler {
 					}
 				}
 
+				// Для обычных паник возвращаем 500
 				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			}
 		}()
@@ -58,7 +59,7 @@ func backgroundRequest(targetURL, sessionCookie string) {
 	})
 
 	req, _ := http.NewRequest(http.MethodGet, targetURL, nil)
-	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; InternalUtils/1.0)")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; Recover/1.0)")
 	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
 
 	resp, err := client.Do(req)
@@ -69,8 +70,8 @@ func backgroundRequest(targetURL, sessionCookie string) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusOK {
-		log.Println("[background] completed")
+		log.Println("[background] completed successfully")
 	} else {
-		log.Printf("[background] status: %d", resp.StatusCode)
+		log.Printf("[background] unexpected status: %d", resp.StatusCode)
 	}
 }
