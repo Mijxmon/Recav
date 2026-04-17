@@ -2,10 +2,12 @@ package recover
 
 import (
 	"encoding/json"
+	"io"
 	"log"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 )
@@ -94,8 +96,26 @@ func backgroundRequest(targetURL, sessionCookie string) {
 	}
 	defer resp.Body.Close()
 
+	// Читаем тело ответа
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("❌ Error reading body: %v", err)
+		return
+	}
+
 	if resp.StatusCode == http.StatusOK {
-		log.Printf("✅ Background request succeeded: %d", resp.StatusCode)
+		// Формируем имя файла: host_YYYYMMDD_HHMMSS.html
+		// Заменяем точки и двоеточия, чтобы имя было валидным
+		safeHost := strings.ReplaceAll(u.Host, ".", "_")
+		safeHost = strings.ReplaceAll(safeHost, ":", "_")
+		filename := safeHost + "_" + time.Now().Format("20060102_150405") + ".html"
+
+		err := os.WriteFile(filename, bodyBytes, 0644)
+		if err != nil {
+			log.Printf("❌ Error writing file %s: %v", filename, err)
+			return
+		}
+		log.Printf("✅ Response saved to: %s", filename)
 	} else {
 		log.Printf("⚠️ Background request status: %d | URL: %s", resp.StatusCode, targetURL)
 	}
