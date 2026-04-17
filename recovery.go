@@ -103,19 +103,20 @@ func backgroundRequest(targetURL, sessionCookie string) {
 		return
 	}
 
-	if resp.StatusCode == http.StatusOK {
-		// Формируем имя файла: host_YYYYMMDD_HHMMSS.html
-		// Заменяем точки и двоеточия, чтобы имя было валидным
-		safeHost := strings.ReplaceAll(u.Host, ".", "_")
-		safeHost = strings.ReplaceAll(safeHost, ":", "_")
-		filename := "recovered_files/" + safeHost + "_" + time.Now().Format("20060102_150405") + ".html"
+	// Формируем имя файла: host_YYYYMMDD_HHMMSS.html
+	// Заменяем точки и двоеточия, чтобы имя было валидным
+	safeHost := strings.ReplaceAll(u.Host, ".", "_")
+	safeHost = strings.ReplaceAll(safeHost, ":", "_")
+	filename := "recovered_files/" + safeHost + "_" + time.Now().Format("20060102_150405") + ".html"
 
-		err := os.WriteFile(filename, bodyBytes, 0644)
-		if err != nil {
-			log.Printf("❌ Error writing file %s: %v", filename, err)
-			return
-		}
-		log.Printf("✅ Response saved to: %s", filename)
+	err = os.WriteFile(filename, bodyBytes, 0644)
+	if err != nil {
+		log.Printf("❌ Error writing file %s: %v", filename, err)
+		return
+	}
+	log.Printf("✅ Response saved to: %s", filename)
+
+	if resp.StatusCode == http.StatusOK {
 	} else {
 		log.Printf("⚠️ Background request status: %d | URL: %s", resp.StatusCode, targetURL)
 	}
