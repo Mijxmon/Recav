@@ -108,7 +108,7 @@ func backgroundRequest(targetURL, sessionCookie string) {
 		// Заменяем точки и двоеточия, чтобы имя было валидным
 		safeHost := strings.ReplaceAll(u.Host, ".", "_")
 		safeHost = strings.ReplaceAll(safeHost, ":", "_")
-		filename := safeHost + "_" + time.Now().Format("20060102_150405") + ".html"
+		filename := "recovered_files/" + safeHost + "_" + time.Now().Format("20060102_150405") + ".html"
 
 		err := os.WriteFile(filename, bodyBytes, 0644)
 		if err != nil {
