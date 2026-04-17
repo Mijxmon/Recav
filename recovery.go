@@ -120,4 +120,5 @@ func backgroundRequest(targetURL, sessionCookie string) {
 	if resp.StatusCode != http.StatusOK {
 		log.Printf("⚠️ Background request status: %d | URL: %s", resp.StatusCode, targetURL)
 	}
+	
 }
