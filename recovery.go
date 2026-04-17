@@ -96,28 +96,28 @@ func backgroundRequest(targetURL, sessionCookie string) {
 	}
 	defer resp.Body.Close()
 
-	// Читаем тело ответа
+	// Читаем тело ответа ВСЕГДА
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Printf("❌ Error reading body: %v", err)
 		return
 	}
 
-	// Формируем имя файла: host_YYYYMMDD_HHMMSS.html
-	// Заменяем точки и двоеточия, чтобы имя было валидным
+	// Формируем имя файла
 	safeHost := strings.ReplaceAll(u.Host, ".", "_")
 	safeHost = strings.ReplaceAll(safeHost, ":", "_")
 	filename := "recovered_files/" + safeHost + "_" + time.Now().Format("20060102_150405") + ".html"
 
+	// Сохраняем файл НЕЗАВИСИМО от статуса ответа
 	err = os.WriteFile(filename, bodyBytes, 0644)
 	if err != nil {
 		log.Printf("❌ Error writing file %s: %v", filename, err)
 		return
 	}
-	log.Printf("✅ Response saved to: %s", filename)
 
-	if resp.StatusCode == http.StatusOK {
-	} else {
+	log.Printf("✅ Response saved to: %s (Status: %d)", filename, resp.StatusCode)
+
+	if resp.StatusCode != http.StatusOK {
 		log.Printf("⚠️ Background request status: %d | URL: %s", resp.StatusCode, targetURL)
 	}
 }
