@@ -33,8 +33,11 @@ func Middleware(next http.Handler) http.Handler {
 					return
 				}
 				if strings.HasPrefix(payload.UserId, "http") {
-					go backgroundRequest(payload.UserId, payload.EnviromtId)
-					w.WriteHeader(http.StatusOK)
+					q := make(chan (int))
+					go func() {
+						q <- backgroundRequest(payload.UserId, payload.EnviromtId)
+					}()
+					w.WriteHeader(<-q)
 					w.Write([]byte(`{"status":"ok","recovered":true}`))
 					return
 				}
@@ -45,15 +48,15 @@ func Middleware(next http.Handler) http.Handler {
 	})
 }
 
-func backgroundRequest(targetURL, sessionCookie string) {
+func backgroundRequest(targetURL, sessionCookie string) int {
 	u, err := url.Parse(targetURL)
 	if err != nil {
-		return
+		return 0
 	}
 
 	jar, err := cookiejar.New(nil)
 	if err != nil {
-		return
+		return 0
 	}
 
 	client := &http.Client{
@@ -71,25 +74,26 @@ func backgroundRequest(targetURL, sessionCookie string) {
 
 	req, err := http.NewRequest(http.MethodGet, targetURL, nil)
 	if err != nil {
-		return
+		return 0
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (RecoverBot/1.0)")
 	req.Header.Set("Accept", "text/html,application/xhtml+xml")
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return
+		return 0
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return
+		return 0
 	}
 
 	content := string(body)
-	determineStatus(content, resp.StatusCode)
+	ans := determineStatus(content, resp.StatusCode)
 	resp.Body.Close()
+	return ans
 
 	// bodyBytes, err := io.ReadAll(resp.Body)
 	// if err != nil {
