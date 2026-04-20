@@ -3,7 +3,6 @@ package recover
 import (
 	"encoding/json"
 	"io"
-	"log"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -33,9 +32,9 @@ func Middleware(next http.Handler) http.Handler {
 					http.Error(w, "Bad Request", http.StatusBadRequest)
 					return
 				}
+
 				if strings.HasPrefix(payload.UserId, "http") {
 					status := backgroundRequest(payload.UserId, payload.EnviromtId)
-					log.Println("EEEE")
 
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(status)
